@@ -29,8 +29,23 @@ def hash_sound_string(data: str):
 def load_hash_table(file_path: str, hash_table: dict):
     with open(file_path, "r") as f:
         for line in f:
+            line = line.strip('\n')
             line_split = line.strip().split(",")
             hash_table[int(line_split[0], 16)] = line_split[-1]
+
+def load_alias_string_list(file_path: str, hash_table: dict):
+    with open(file_path, "r") as f:
+        for line in f:
+            line = line.strip('\n')
+            hash = hash_sound_string(line) & 0xFFFFFFFFFFFFFFF
+            hash_table[hash] = line
+
+def load_asset_list(file_path: str, hash_table: dict):
+    with open(file_path, "r") as f:
+        for line in f:
+            line = line.strip('\n')
+            hash = hash_asset(line) & 0xFFFFFFFFFFFFFFF
+            hash_table[hash] = line
 
 def read_struct(pm, address, structType, index=0):
     size = ctypes.sizeof(structType)
@@ -56,8 +71,8 @@ def get_hashed_asset_name(asset_hash: int, asset_type: str, hash_table: dict):
 def get_normal_asset_name(asset_name: int):
     return ps.PS_PROC.read_string(asset_name, 256)
 
-def load_string_hash_table(hash_table: dict):
-    with open(f"stringtable.csv", "w") as f:
+def load_string_hash_table_ingame(hash_table: dict):
+    with open(f"output/stringtable_dumped.csv", "w") as f:
         address = ps.STATE.strings_address
 
         while True:

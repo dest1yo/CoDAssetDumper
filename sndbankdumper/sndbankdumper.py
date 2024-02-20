@@ -5,8 +5,6 @@ import util
 import config
 import assettable
 
-STRING_HASH_TABLE = {}
-
 # Type definition
 class MW6XSndBank(ctypes.Structure):
     _fields_ = [
@@ -37,17 +35,33 @@ else:
 
 # Base func
 def dump_sndbank(asset: ps.XAsset64, type_name: str):
-    os.makedirs(f"{type_name}_{CURR_GAME}", exist_ok=True)
+    # Make dir
+    output_dir = f"output/{type_name}_{CURR_GAME}"
+    os.makedirs(output_dir, exist_ok=True)
 
+    # Read asset header
     pkg_header = util.read_struct(ps.PS_PROC, asset.Header, CURR_TYPE)
     # print('Name:', hex(pkg_header.Name))
 
+    # If it has no alias, return
     if ((pkg_header.Count == 0) or (pkg_header.SndAliasList == 0)):
         return
 
     # print('SndAliasList:', hex(pkg_header.SndAliasList))
     asset_file_name = GET_XASSET_NAME(pkg_header.Name, type_name, assettable.BANK_ASSET_HASH_TABLE)
-    with open(f"{type_name}_{CURR_GAME}\\{asset_file_name}.csv", "w") as f:
+
+    # When a new bank name is hit, the old hash naming file will be deleted.
+    # TODO: Not a good method but for temporary use.
+    asset_hash = pkg_header.Name & 0xFFFFFFFFFFFFFFF
+    file_hash_name = f"{type_name}_{asset_hash:x}"
+    file_hash_path = f"{output_dir}/{file_hash_name}.csv"
+
+    if (file_hash_name != asset_file_name) and (os.path.exists(file_hash_path)):
+        os.remove(file_hash_path)
+        print("Hit New Bank Name:", asset_file_name)
+        print("Remove file:", file_hash_name)
+
+    with open(f"{output_dir}/{asset_file_name}.csv", "w") as f:
         f.write("name,secondary,file\n")
 
         for i in range(pkg_header.Count):
@@ -65,10 +79,10 @@ def dump_sndbank(asset: ps.XAsset64, type_name: str):
                 assetFileName = ""
 
                 if sndAlias.AliasName != 0:
-                    aliasName = GET_XASSET_NAME(sndAlias.AliasName, '', STRING_HASH_TABLE)
+                    aliasName = GET_XASSET_NAME(sndAlias.AliasName, '', assettable.STRING_HASH_TABLE)
 
                 if sndAlias.SecondaryAliasName != 0:
-                    secondaryAliasName = GET_XASSET_NAME(sndAlias.SecondaryAliasName, '', STRING_HASH_TABLE)
+                    secondaryAliasName = GET_XASSET_NAME(sndAlias.SecondaryAliasName, '', assettable.STRING_HASH_TABLE)
 
                 if sndAlias.AssetFileName != 0:
                     file_hash = ps.PS_PROC.read_ulonglong(sndAlias.AssetFileName)
@@ -86,25 +100,32 @@ def read_sndbank_tr(asset: ps.XAsset64):
 
 # Main func
 
-# Load string hash table
-if config.fill_string_table or config.only_export_string_table:
-    util.load_string_hash_table(STRING_HASH_TABLE)
-    print("string_hash_table Loaded.")
+# Load string hash table ingame
+if config.load_string_table_ingame or config.only_export_string_table_ingame:
+    util.load_string_hash_table_ingame(assettable.STRING_HASH_TABLE)
+    print("Loaded string_hash_table_ingame.")
 
-if config.only_export_string_table:
-    print("only export stringtable Finished.")
+if config.only_export_string_table_ingame:
+    print("Finished export stringtable(only).")
     exit()
 
+# Load string hash table
+if config.fill_string_table:
+    assettable.load_alias_string_hash_table()
+    print("Loaded string_hash_table.")
+
 # Load sound asset hash table
-if config.fill_asset_table:
+if config.fill_snd_asset_table:
+    # List
     assettable.load_snd_asset_hash_table()
-    util.load_hash_table("wni\\fnv1a_xsounds.csv", assettable.SND_ASSET_HASH_TABLE)
-    print("snd_asset_hash_table Loaded.")
+    # Hash table
+    util.load_hash_table("data/wni/fnv1a_xsounds.csv", assettable.SND_ASSET_HASH_TABLE)
+    print("Loaded snd_asset_hash_table.")
 
 # Load bank asset hash table
 if config.fill_bank_asset_table:
     assettable.load_bank_asset_hash_table()
-    print("bank_asset_hash_table Loaded.")
+    print("Loaded bank_asset_hash_table.")
 
 # Sound Bank dumper
 if config.dump_sndbank:
